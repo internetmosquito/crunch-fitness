@@ -3,6 +3,7 @@ import json
 import sys
 from cr.db.store import global_settings as settings, connect
 
+
 class Root(object):
 
     def __init__(self, settings):
@@ -52,6 +53,12 @@ class Root(object):
         changing position every few minutes?
         """
 
-def run():
-    settings.update(json.load(file(sys.argv[1])))
+#
+# def run():
+#     #settings.update(json.load(open(sys.argv[1])))
+#     cherrypy.quickstart(Root(settings))
+
+if __name__ == '__main__':
+    import ipdb; ipdb.set_trace()
+    settings.update(json.load(open(sys.argv[1])))
     cherrypy.quickstart(Root(settings))

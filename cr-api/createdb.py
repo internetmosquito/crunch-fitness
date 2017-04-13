@@ -9,7 +9,6 @@ A lightweight wrapper on load_data to create and populate db outside cr.db modul
 
 
 def create_db(arguments):
-    import ipdb; ipdb.set_trace()
     clean = False
     try:
         opts, args = getopt.getopt(arguments, 'hc', ['clean'])
@@ -26,7 +25,6 @@ def create_db(arguments):
 
     settings = Settings()
     settings.url = 'mongodb://localhost:27017/crunchdb'
-    import ipdb; ipdb.set_trace()
     load_data(settings, clean)
 
 
