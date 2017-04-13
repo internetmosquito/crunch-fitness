@@ -17,6 +17,8 @@ setup(
     install_requires=['pymongo'],
     tests_require=[],
     packages=find_packages(exclude=['ez_setup']),
+    package_dir={'cr': 'cr'},
+    package_data={'db': ['cr/db/*.json']},
     namespace_packages=['cr'],
     include_package_data=True,
     zip_safe=False,
