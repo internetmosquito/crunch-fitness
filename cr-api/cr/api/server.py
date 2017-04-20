@@ -2,41 +2,12 @@ import cherrypy
 import hashlib
 import json
 import sys
-import base64
-import re
+
 
 from cr.db.store import global_settings as settings
 from cr.db.store import connect
 from cr.db.store import global_db as db
 
-
-# def check_success():
-#     return False
-#
-# def validate_password(realm, username, password):
-#     import ipdb; ipdb.set_trace()
-#     # Check provided password is valid
-#     users = Root.get_db().users
-#     user = users.find_one({"email": username})
-#     # Check if provided password matches
-#     stored_password = hashlib.sha1(user.password.encode()).hexdigest()
-#     if password == stored_password:
-#         cherrypy.session[SESSION_KEY] = user.email
-#         return cherrypy.HTTPRedirect('/users')
-#     else:
-#         return cherrypy.HTTPError("401 Unauthorized")
-#
-# def do_redirect():
-#     raise cherrypy.HTTPRedirect("/login")
-#
-# def check_auth(call_func=do_redirect):
-#     # do check ...
-#     import ipdb; ipdb.set_trace()
-#     if check_success():
-#         return
-#     call_func()
-#
-# cherrypy.tools.auth = cherrypy.Tool('before_handler', check_auth, priority=60)
 
 SESSION_KEY = 'user'
 main = None
@@ -56,7 +27,12 @@ def user_verify(username, password):
 
 
 def protect(*args, **kwargs):
-    import ipdb; ipdb.set_trace()
+    """
+    Just a hook for checking protected resources
+    :param args:
+    :param kwargs:
+    :return: 401 if unauthenticated access found (based on session id)
+    """
     authenticated = False
     # Check if provided endpoint requires authentication
     condition = cherrypy.request.config.get('auth.require', None)
@@ -64,81 +40,16 @@ def protect(*args, **kwargs):
         try:
             # Try to get the current session
             cherrypy.session[SESSION_KEY]
-            cherrypy.session.regenerate()
+            # cherrypy.session.regenerate()
             cherrypy.request.login = cherrypy.session[SESSION_KEY]
+            # TODO: Should we check if cookie session ID matches the one stored here?
             authenticated = True
-        # If there is no session yet, try to authenticate using Basic approach
-        # Note this will only work for Basic Auth without ":" character in passw
+        # If there is no session yet, simply redirect to index page
         except KeyError:
-            # Get the Basic Auth header
-            authheader = cherrypy.request.headers.get('AUTHORIZATION')
-            if authheader:
+            cherrypy.HTTPError(401, u'Not authorized to access this resource. Please login.')
 
-                b64data = re.sub('Basic ', '', authheader)
-                decodeddata = base64.b64decode(b64data.encode('ASCII'))
-                email, passphrase = decodeddata.decode().split(":", 1)
-
-                if user_verify(email, passphrase):
-                    cherrypy.session.regenerate()
-                    # Set Session value and request login, not really sure if this is needed
-                    cherrypy.session[SESSION_KEY] = cherrypy.request.login = email
-                    authenticated = True
-                else:
-                    print('Attempted to log in with HTTBA username {} but failed.'.format(email))
-            else:
-                print('Auth header was not present.')
-
-        except:
-            print('Ops, looks like no Authorization header was provided, mostly because other auth mechanism was used '
-                  'instead of Basic')
-
-        if not authenticated:
-            raise cherrypy.HTTPError("401 Unauthorized")
-
-        # if authenticated:
-        #     for condition in conditions:
-        #         if not condition():
-        #             print("Authentication succeeded but authorization failed.")
-        #             raise cherrypy.HTTPError("403 Forbidden")
-        # else:
-        #     raise cherrypy.HTTPError("401 Unauthorized")
-
-# Let's
+# Specify the hook
 cherrypy.tools.crunch = cherrypy.Tool('before_handler', protect)
-
-
-# def require(*conditions):
-#     """A decorator that appends conditions to the auth.require config
-#     variable."""
-#     def decorate(f):
-#         import ipdb; ipdb.set_trace()
-#         if not hasattr(f, '_cp_config'):
-#             f._cp_config = dict()
-#         if 'auth.require' not in f._cp_config:
-#             f._cp_config['auth.require'] = []
-#         f._cp_config['auth.require'].extend(conditions)
-#         return f
-#     return decorate
-
-#### CONDITIONS
-#
-# Conditions are callables that return True
-# if the user fulfills the conditions they define, False otherwise
-#
-# They can access the current user as cherrypy.request.login
-
-# # TODO: test this function with cookies, I want to make sure that cherrypy.request.login is
-# #       set properly so that this function can use it.
-# def user_is(reqd_email):
-#     import ipdb; ipdb.set_trace()
-#     return lambda: reqd_email == cherrypy.request.login
-
-#### END CONDITIONS
-
-def logout():
-    email = cherrypy.session.get(SESSION_KEY, None)
-    cherrypy.session[SESSION_KEY] = cherrypy.request.login = None
-    return "Logout successful"
 
 
 class Root(object):
@@ -152,7 +63,7 @@ class Root(object):
         import ipdb; ipdb.set_trace()
         # If authenticated, return to users view
         if SESSION_KEY in cherrypy.session:
-            return cherrypy.HTTPRedirect("/users", status=301)
+            raise cherrypy.HTTPRedirect(u'/users', status=301)
         else:
             return 'Welcome to Crunch.  Please <a href="/login">login</a>.'
 
@@ -161,7 +72,7 @@ class Root(object):
     @cherrypy.expose
     @cherrypy.config(**{'auth.require': True})
     # @require
-    def users(self):
+    def users(self, *args, **kwargs):
         """
         for GET: update this to return a json stream defining a listing of the users
         for POST: should add a new user to the users collection, with validation
@@ -172,9 +83,9 @@ class Root(object):
         note: Always return the appropriate response for the action requested.
         """
         import ipdb; ipdb.set_trace()
-        if cherrypy.request.method is 'GET':
+        if cherrypy.request.method == 'GET':
             return json.dumps({'users': [u for u in self.db.users.find()]})
-        elif cherrypy.request.method is 'POST':
+        elif cherrypy.request.method == 'POST':
             # Get post form data and create a new user
             user = cherrypy.request.json
             return user
@@ -222,15 +133,16 @@ class Root(object):
             # Get post form data and create a new user
             if 'password' and 'username' in kwargs:
                 user = kwargs['username']
-                password = kwargs['username']
-            # Check provided password is valid
-            users = self.db.users
-            user = users.find_one({"email": user})
-            # Check if provided password matches
-            password == hashlib.sha1(user.password.encode()).hexdigest()
-            if password:
-                cherrypy.session[SESSION_KEY] = user.email
-            return cherrypy.HTTPRedirect('/users')
+                password = kwargs['password']
+                if user_verify(user, password):
+                    # FIXME: Not sure if this is needed, in theory Cherrypy recreates session if cookie ID != session ID
+                    cherrypy.session.regenerate()
+                    cherrypy.session[SESSION_KEY] = cherrypy.request.login = user
+                    # Redirect to users
+                    raise cherrypy.HTTPRedirect(u'/users', status=301)
+                else:
+                    raise cherrypy.HTTPError(u'401 Unauthorized')
+
 
     @cherrypy.tools.allow(methods=['GET'])
     @cherrypy.expose
@@ -250,27 +162,11 @@ class Root(object):
         changing position every few minutes?
         """
 
-#
-# def run():
-#     #settings.update(json.load(open(sys.argv[1])))
-#     cherrypy.quickstart(Root(settings))
-
 if __name__ == '__main__':
-    # conf = {
-    #    '/': {
-    #     'tools.sessions.on': True,
-    #     'tools.sessions.name': 'zknsrv',
-    #     'tools.auth_basic.on': True,
-    #     'tools.auth_basic.realm': 'zknsrv',
-    #     'tools.auth_basic.checkpassword': validate_password,
-    #     }
-    # }
-    config_root = {
-    '/' : {
+    config_root = {'/': {
         'tools.crunch.on': True,
         'tools.sessions.on': True,
-        'tools.sessions.name': 'crunch',
-        }
+        'tools.sessions.name': 'crunch', }
     }
     settings.update(json.load(open(sys.argv[1])))
     main = Root(settings)
