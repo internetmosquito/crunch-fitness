@@ -9,7 +9,7 @@ thisdir = os.path.abspath(os.path.dirname(__file__))
 
 setup(
     name='cr.api',
-    version='1.0',
+    version='1.1',
     description="Crunch API",
     author=u'Crunch.io',
     author_email='dev@crunch.io',

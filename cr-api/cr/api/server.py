@@ -2,11 +2,10 @@ import cherrypy
 import hashlib
 import json
 import sys
-
+from bson import json_util
 
 from cr.db.store import global_settings as settings
 from cr.db.store import connect
-from cr.db.store import global_db as db
 
 
 SESSION_KEY = 'user'
@@ -60,7 +59,6 @@ class Root(object):
     @cherrypy.expose
     @cherrypy.config(**{'auth.require': True, 'tools.crunch.on': False})
     def index(self):
-        import ipdb; ipdb.set_trace()
         # If authenticated, return to users view
         if SESSION_KEY in cherrypy.session:
             raise cherrypy.HTTPRedirect(u'/users', status=301)
@@ -71,6 +69,7 @@ class Root(object):
     @cherrypy.tools.allow(methods=['GET', 'POST'])
     @cherrypy.expose
     @cherrypy.config(**{'auth.require': True})
+    @cherrypy.tools.json_in()
     # @require
     def users(self, *args, **kwargs):
         """
@@ -82,13 +81,15 @@ class Root(object):
 
         note: Always return the appropriate response for the action requested.
         """
-        import ipdb; ipdb.set_trace()
         if cherrypy.request.method == 'GET':
-            return json.dumps({'users': [u for u in self.db.users.find()]})
+            return json.dumps({'users': [u for u in self.db.users.find()]}, default=json_util.default)
         elif cherrypy.request.method == 'POST':
             # Get post form data and create a new user
-            user = cherrypy.request.json
-            return user
+            input_json = cherrypy.request.json
+            new_id = self.db.users.insert_one(input_json)
+            new_user = self.db.users.find_one(new_id.inserted_id)
+            cherrypy.response.status = 201
+            return json.dumps(new_user, default=json_util.default)
 
 
     @cherrypy.tools.allow(methods=['GET', 'POST'])
@@ -104,7 +105,6 @@ class Root(object):
         hint: this is how the admin's password was generated:
               import hashlib; hashlib.sha1('123456').hexdigest()
         """
-        import ipdb; ipdb.set_trace()
         if cherrypy.request.method == 'GET':
             # Check if user is logged in already
             if SESSION_KEY in cherrypy.session:
