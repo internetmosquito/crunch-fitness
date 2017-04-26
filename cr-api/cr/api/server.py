@@ -12,19 +12,6 @@ SESSION_KEY = 'user'
 main = None
 
 
-def user_verify(username, password):
-    """
-    Simply checks if a user with provided email and pass exists in db
-    :param username: User email
-    :param password:  User pass
-    :return: True if user found
-    """
-    users = main.db.users
-    user = users.find_one({"email": username})
-    password = hashlib.sha1(password.encode()).hexdigest()
-    return password == user['hash']
-
-
 def protect(*args, **kwargs):
     """
     Just a hook for checking protected resources
@@ -59,9 +46,11 @@ class Root(object):
     @cherrypy.expose
     @cherrypy.config(**{'auth.require': True, 'tools.crunch.on': False})
     def index(self):
+        import ipdb; ipdb.set_trace()
         # If authenticated, return to users view
-        if SESSION_KEY in cherrypy.session:
-            raise cherrypy.HTTPRedirect(u'/users', status=301)
+        if cherrypy.session:
+            if SESSION_KEY in cherrypy.session:
+                raise cherrypy.HTTPRedirect(u'/users', status=301)
         else:
             return 'Welcome to Crunch.  Please <a href="/login">login</a>.'
 
@@ -105,36 +94,38 @@ class Root(object):
         hint: this is how the admin's password was generated:
               import hashlib; hashlib.sha1('123456').hexdigest()
         """
+        import ipdb; ipdb.set_trace()
         if cherrypy.request.method == 'GET':
             # Check if user is logged in already
-            if SESSION_KEY in cherrypy.session:
-                return """<html>
-                  <head></head>
-                  <body>
-                    <form method="post" action="logout">
-                      <label>Click button to logout</label>
-                      <button type="submit">Logout</button>
-                    </form>
-                  </body>
-                </html>"""
+            if cherrypy.session:
+                if SESSION_KEY in cherrypy.session:
+                    return """<html>
+                      <head></head>
+                      <body>
+                        <form method="post" action="logout">
+                          <label>Click button to logout</label>
+                          <button type="submit">Logout</button>
+                        </form>
+                      </body>
+                    </html>"""
 
-            else:
-                return """<html>
-                  <head></head>
-                  <body>
-                    <form method="post" action="login">
-                      <input type="text" value="Enter email" name="username" />
-                      <input type="password" value="Enter password" name="password" />
-                      <button type="submit">Login</button>
-                    </form>
-                  </body>
-                </html>"""
+            return """<html>
+              <head></head>
+              <body>
+                <form method="post" action="login">
+                  <input type="text" value="Enter email" name="username" />
+                  <input type="password" value="Enter password" name="password" />
+                  <button type="submit">Login</button>
+                </form>
+              </body>
+            </html>"""
+
         elif cherrypy.request.method == 'POST':
             # Get post form data and create a new user
             if 'password' and 'username' in kwargs:
                 user = kwargs['username']
                 password = kwargs['password']
-                if user_verify(user, password):
+                if self.user_verify(user, password):
                     # FIXME: Not sure if this is needed, in theory Cherrypy recreates session if cookie ID != session ID
                     cherrypy.session.regenerate()
                     cherrypy.session[SESSION_KEY] = cherrypy.request.login = user
@@ -161,6 +152,18 @@ class Root(object):
         Don't code, but explain how would you scale this to 1,000,000 users, considering users
         changing position every few minutes?
         """
+
+    def user_verify(self, username, password):
+        """
+        Simply checks if a user with provided email and pass exists in db
+        :param username: User email
+        :param password:  User pass
+        :return: True if user found
+        """
+        users = self.db.users
+        user = users.find_one({"email": username})
+        password = hashlib.sha1(password.encode()).hexdigest()
+        return password == user['hash']
 
 if __name__ == '__main__':
     config_root = {'/': {
