@@ -127,7 +127,6 @@ class BaseCherryPyTestCase(unittest.TestCase):
                 fd = None
 
         if response.output_status.startswith(b'500'):
-            import ipdb; ipdb.set_trace()
             print(response.body)
             raise AssertionError("Unexpected error")
 
@@ -140,7 +139,6 @@ class TestCherryPyCrunchApp(BaseCherryPyTestCase):
 
     def test_index(self):
         response = self.request('/')
-        import ipdb; ipdb.set_trace()
         self.assertEqual(response.status, '200 OK')
         # Why the heck body comes as bytes?
         self.assertIn(response.body[0].decode('utf-8'), 'Welcome to Crunch.  Please <a href="/login">login</a>.')

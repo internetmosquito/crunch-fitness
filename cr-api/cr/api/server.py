@@ -46,7 +46,6 @@ class Root(object):
     @cherrypy.expose
     @cherrypy.config(**{'auth.require': True, 'tools.crunch.on': False})
     def index(self):
-        import ipdb; ipdb.set_trace()
         # If authenticated, return to users view
         if cherrypy.session:
             if SESSION_KEY in cherrypy.session:
@@ -94,7 +93,6 @@ class Root(object):
         hint: this is how the admin's password was generated:
               import hashlib; hashlib.sha1('123456').hexdigest()
         """
-        import ipdb; ipdb.set_trace()
         if cherrypy.request.method == 'GET':
             # Check if user is logged in already
             if cherrypy.session:
