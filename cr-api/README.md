@@ -1,19 +1,49 @@
-Welcome to the Crunch.io api fitness test.
+**SOME NOTES**
 
-Here you will find a python package to help us evaluate your skills with:
+Need to run createdb first in order to populate database with some data, is just a thin wrapper on load_data from cr.db
+module. You can use that directly but this will avoid having to import and use that package.
 
-1. Problem Solving
-2. Web Server API Design
-3. Request-time data manipulation
-4. Testing strategies
+Keep in mind we're using Python 3 for this.
 
-Instructions
+In order to start the server, simply:
 
-1. Fork the repo into a private repo.
-2. Create a virtualenv for this project and install the cr-api and cr-db packages into your environment.
-3. Modify the cr-api package to complete the task, the code is commented with task items.
-4. Let us know when you have finished.
+```
+python server.py settings.json
+```
 
-Deliverable
+The JSON file contains simply the db URL that is required by the Settings object from cr.db package.
 
-Publish your work in a GitHub repository.
+Testing some stuff with CURL:
+
+You can use the browser but is always more fun with Curl :)
+
+Let's make a request to login to authenticate.
+
+```
+curl --cookie-jar cookie.jar --data "username=some@user.com&password=somesecret" http://localhost:8080/login
+```
+
+You can inspect the generated cookie.jar file, then let's make a call to users endpoint
+
+```
+curl --cookie "crunch=d1faadf80031fd8c91a45c7c2f5cf32f4f518e40" http://localhost:8080/login
+```
+
+Login out, simply call
+
+```
+curl --cookie "crunch=d1faadf80031fd8c91a45c7c2f5cf32f4f518e40" http://localhost:8080/logout
+```
+
+**TESTING**
+
+Still work in progress, had to mock some session object because for some reason while testing session data is removed 
+between requests.
+
+To run cr.api tests:
+
+```
+cd cr/api
+py.test -s tests.py
+```
+

@@ -47,8 +47,7 @@ class Root(object):
     @cherrypy.config(**{'auth.require': True, 'tools.crunch.on': False})
     def index(self):
         # If authenticated, return to users view
-        if cherrypy.session:
-            if SESSION_KEY in cherrypy.session:
+        if SESSION_KEY in cherrypy.session:
                 raise cherrypy.HTTPRedirect(u'/users', status=301)
         else:
             return 'Welcome to Crunch.  Please <a href="/login">login</a>.'
@@ -95,17 +94,16 @@ class Root(object):
         """
         if cherrypy.request.method == 'GET':
             # Check if user is logged in already
-            if cherrypy.session:
-                if SESSION_KEY in cherrypy.session:
-                    return """<html>
-                      <head></head>
-                      <body>
-                        <form method="post" action="logout">
-                          <label>Click button to logout</label>
-                          <button type="submit">Logout</button>
-                        </form>
-                      </body>
-                    </html>"""
+            if SESSION_KEY in cherrypy.session:
+                return """<html>
+                  <head></head>
+                  <body>
+                    <form method="post" action="logout">
+                      <label>Click button to logout</label>
+                      <button type="submit">Logout</button>
+                    </form>
+                  </body>
+                </html>"""
 
             return """<html>
               <head></head>
@@ -131,6 +129,8 @@ class Root(object):
                     raise cherrypy.HTTPRedirect(u'/users', status=301)
                 else:
                     raise cherrypy.HTTPError(u'401 Unauthorized')
+            else:
+                raise cherrypy.HTTPError(u'401 Please provide username and password')
 
 
     @cherrypy.tools.allow(methods=['GET'])
@@ -139,6 +139,12 @@ class Root(object):
         """
         Should log the user out, rendering them incapable of accessing the users endpoint, but
         """
+        if SESSION_KEY in cherrypy.session:
+            cherrypy.session.regenerate()
+            return 'Logged out, we will miss you dearly!.'
+        else:
+            raise cherrypy.HTTPRedirect(u'/', status=301)
+
 
     @cherrypy.expose
     def distances(self):
