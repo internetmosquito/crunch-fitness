@@ -32,7 +32,7 @@ def protect(*args, **kwargs):
             authenticated = True
         # If there is no session yet, simply redirect to index page
         except KeyError:
-            cherrypy.HTTPError(401, u'Not authorized to access this resource. Please login.')
+            raise cherrypy.HTTPError(401, u'Not authorized to access this resource. Please login.')
 
 # Specify the hook
 cherrypy.tools.crunch = cherrypy.Tool('before_handler', protect)
@@ -166,8 +166,10 @@ class Root(object):
         """
         users = self.db.users
         user = users.find_one({"email": username})
-        password = hashlib.sha1(password.encode()).hexdigest()
-        return password == user['hash']
+        if user:
+            password = hashlib.sha1(password.encode()).hexdigest()
+            return password == user['hash']
+        return False
 
 if __name__ == '__main__':
     config_root = {'/': {
