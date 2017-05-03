@@ -3,6 +3,9 @@ import hashlib
 import json
 import sys
 from bson import json_util
+import itertools
+import math
+import numpy as np
 
 from cr.db.store import global_settings as settings
 from cr.db.store import connect
@@ -10,6 +13,67 @@ from cr.db.store import connect
 
 SESSION_KEY = 'user'
 main = None
+
+# A formatting helper
+float_formatter = lambda x: "%.2f" % x
+
+
+def get_np_array_from_users(users):
+    """
+    A naive way to transform the collection of users to a numpy array, suboptimal and might require
+    to find a decent driver to do this, but for testing is ok for now
+    :param users: The list containing our users collection
+    :return: A numpy array containing tuples (lat, lng) or None if there were no users
+    """
+    np_array = None
+    if users:
+        points = [(user['latitude'], user['longitude']) for user in users]
+        dt = np.dtype('float, float')
+        np_array = np.array(points, dtype=dt)
+        return np_array
+    return np_array
+
+
+def get_metrics_for_distances(distances):
+    """
+    Given an array with distances, will return max, min and average and std in meters
+    :param distances: A list where each element is a float representing a distance in meters
+    :return: Maximun, Minimun and average distances
+    """
+    max_d = min_d = avg_d = std_d = 0.0
+    if distances:
+        # Reconstruct an numpy array from distances
+        np_array = np.array(distances)
+        max_d = float_formatter(np.amax(np_array))
+        min_d = float_formatter(np.amin(np_array))
+        avg_d = float_formatter(np.average(np_array))
+        std_d = float_formatter(np.std(np_array))
+
+    return max_d, min_d, avg_d, std_d
+
+
+def np_haversine(point_a, point_b):
+    """
+    Calculates great circle distance using Haversine formula
+    :param point_a: The first pair lat-lng
+    :param point_b: The second pair lat-lng
+    :return: The calculated distance, in kilometers
+    """
+    # convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(math.radians, [point_a[0],
+                                                point_a[1],
+                                                point_b[0],
+                                                point_b[1]])
+    d_lon = lon2 - lon1
+    d_lat = lat2 - lat1
+    # This is the Haversine function https://en.wikipedia.org/wiki/Haversine_formula,
+    # Used to calculate great circle distance, assuming earth is a perfect Sphere
+    # But using Numpy functions instead
+    a = np.sin(d_lat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(d_lon / 2) ** 2
+    c = 2 * np.arcsin(np.sqrt(a))
+    # Radius of earth in in km is 6371
+    r = 6371
+    return c*r
 
 
 def protect(*args, **kwargs):
@@ -57,7 +121,6 @@ class Root(object):
     @cherrypy.expose
     @cherrypy.config(**{'auth.require': True})
     @cherrypy.tools.json_in()
-    # @require
     def users(self, *args, **kwargs):
         """
         for GET: update this to return a json stream defining a listing of the users
@@ -145,8 +208,10 @@ class Root(object):
         else:
             raise cherrypy.HTTPRedirect(u'/', status=301)
 
-
     @cherrypy.expose
+    @cherrypy.tools.allow(methods=['GET', 'POST'])
+    @cherrypy.config(**{'auth.require': True})
+    @cherrypy.tools.json_out()
     def distances(self):
         """
         Each user has a lat/lon associated with them.  Using only numpy, determine the distance
@@ -156,6 +221,20 @@ class Root(object):
         Don't code, but explain how would you scale this to 1,000,000 users, considering users
         changing position every few minutes?
         """
+        users = self.db.users.find()
+        np_array = get_np_array_from_users(users)
+        distances = []
+        # FIXME: this approach takes O(n*n) complexity, not the best approach, will be quadratic in no time
+        for point_a, point_b in itertools.combinations(np_array, 2):
+            distances.append(np_haversine(point_a, point_b))
+
+        max_d, min_d, avg_d, std_d = get_metrics_for_distances(distances)
+        response = {}
+        response['Maximun distance'] = max_d
+        response['Minimum distance'] = min_d
+        response['Average distance'] = avg_d
+        response['Standard deviation'] = std_d
+        return response
 
     def user_verify(self, username, password):
         """

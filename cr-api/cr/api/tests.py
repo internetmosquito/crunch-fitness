@@ -5,7 +5,6 @@ from cherrypy.test import helper
 from cherrypy.lib.sessions import RamSession
 from .server import Root
 from cr.db.store import global_settings as settings
-from cr.db.store import Settings
 from cr.db.loader import load_data
 
 DB_URL = 'mongodb://localhost:27017/test_crunchdb'
@@ -161,4 +160,33 @@ class SimpleCPTest(helper.CPWebCase):
             response = self.getPage('/users', method='GET')
             self.assertStatus('200 OK')
 
-
+    def test_distances_returns_401_if_not_logged_in(self):
+        # Unauthenticated GET should show redirect to index
+        response = self.getPage('/distances', method='GET')
+        self.assertStatus('401 Unauthorized')
+        # Try to authenticate
+        data = {
+            'username': 'admin@crunch.io',
+            'password': '123456',
+        }
+        query_string = urllib.parse.urlencode(data)
+        # Login should work and be redirected to users
+        response = self.getPage('/login', method='POST', body=query_string)
+        cookie_data = response[1]
+        path = self.get_redirect_path(cookie_data)
+        if path:
+            # Make sure redirect was to index
+            self.assertEqual(path, '/users')
+        self.assertStatus('301 Moved Permanently')
+        # Check logout actually logs out when logged id
+        sess_mock = RamSession()
+        sess_mock['user'] = 'admin@crunch.io'
+        with patch('cherrypy.session', sess_mock, create=True):
+            # Make a GET again
+            response = self.getPage('/distances', method='GET')
+            self.assertStatus('200 OK')
+            # Check response contains expected format
+            self.assertIn('Maximun distance', response[2].decode())
+            self.assertIn('Minimum distance', response[2].decode())
+            self.assertIn('Average distance', response[2].decode())
+            self.assertIn('Standard deviation', response[2].decode())
